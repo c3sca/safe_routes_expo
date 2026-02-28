@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Find a Safe Route{% endblock %}
+
+{% block content %}
+<div class="map-page">
+
+  <!-- ── Side Panel ─────────────────────────────────────────────── -->
+  <aside class="side-panel" id="sidePanel">
+    <div class="panel-header">
+      <h1 class="panel-title">Find a Safe Route</h1>
+      <p class="panel-subtitle">We'll route you through Edinburgh's safest streets.</p>
+    </div>
+
+    <div class="panel-body">
+      <!-- Start location -->
+      <div class="form-group">
+        <label class="form-label" for="startInput">Start</label>
+        <div class="input-with-icon">
+          <input id="startInput" type="text" class="form-input"
+                 placeholder="e.g. Edinburgh Waverley" autocomplete="off" />
+          <button class="icon-btn" id="useMyLocation" title="Use my location">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Destination -->
+      <div class="form-group">
+        <label class="form-label" for="endInput">Destination</label>
+        <input id="endInput" type="text" class="form-input"
+               placeholder="e.g. The Meadows" autocomplete="off" />
+      </div>
+
+      <!-- Safety vs speed slider -->
+      <div class="form-group">
+        <label class="form-label">
+          Route preference
+          <span class="label-hint" id="alphaLabel">Safe (70%)</span>
+        </label>
+        <div class="slider-row">
+          <span class="slider-label">Fastest</span>
+          <input type="range" id="alphaSlider" min="0" max="1" step="0.05"
+                 value="0.7" class="slider" />
+          <span class="slider-label">Safest</span>
+        </div>
+      </div>
+
+      <!-- Algorithm toggle 
+      <div class="form-group">
+        <label class="form-label">Algorithm</label>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-algo="astar">A* (Recommended)</button>
+          <button class="toggle-btn" data-algo="dijkstra">Dijkstra</button>
+        </div>
+      </div> -->
+
+      <!-- Find route button -->
+      <button id="findRouteBtn" class="btn btn-primary btn-full">
+        Find Safe Route
+      </button>
+
+      <!-- Route result card -->
+      <div id="routeResult" class="route-card hidden">
+        <div class="route-stat">
+          <span class="stat-icon">📍</span>
+          <span id="routeDistance">—</span>
+          <span class="stat-unit">km</span>
+        </div>
+        <div class="route-stat">
+          <span class="stat-icon">⏱</span>
+          <span id="routeTime">—</span>
+          <span class="stat-unit">min walk</span>
+        </div>
+        <div class="route-stat">
+          <span class="stat-icon">🛡</span>
+          <span id="routeSafety">—</span>
+          <span class="stat-unit">/ 10 safety</span>
+        </div>
+        <div class="safety-bar-container">
+          <div class="safety-bar" id="safetyBar"></div>
+        </div>
+        <div class="legend-row">
+          <span class="legend-dot green"></span> Safe &nbsp;
+          <span class="legend-dot yellow"></span> Moderate &nbsp;
+          <span class="legend-dot red"></span> Caution
+        </div>
+      </div>
+
+      <!-- Error message -->
+      <div id="routeError" class="error-card hidden"></div>
+    </div>
+  </aside>
+
+  <!-- ── Map ────────────────────────────────────────────────────── -->
+  <div id="map"></div>
+
+  <!-- Area info popup (clicked on map) -->
+  <div id="areaPopup" class="area-popup hidden">
+    <button class="popup-close" id="closeAreaPopup">×</button>
+    <h3 id="popupAreaName">Area Name</h3>
+    <div class="popup-scores">
+      <div class="popup-score-item">
+        <span class="popup-score-value" id="popupComposite">—</span>
+        <span class="popup-score-label">Overall Safety</span>
+      </div>
+      <div class="popup-score-item">
+        <span class="popup-score-value" id="popupUser">—</span>
+        <span class="popup-score-label">User Rating</span>
+      </div>
+      <div class="popup-score-item">
+        <span class="popup-score-value" id="popupLighting">—</span>
+        <span class="popup-score-label">Lighting</span>
+      </div>
+    </div>
+    <div id="recentRatings"></div>
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('rate') }}" class="btn btn-sm btn-outline">Rate this area</a>
+    {% else %}
+    <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline">Log in to rate</a>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/map.js') }}"></script>
+<script src="{{ url_for('static', filename='js/routing.js') }}"></script>
+{% endblock %}

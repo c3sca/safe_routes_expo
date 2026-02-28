@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Log In{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2">
+        <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-sub">Log in to SafeRoutes to rate areas and save routes.</p>
+
+    <form method="POST" action="{{ url_for('login') }}" class="auth-form">
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <input id="username" name="username" type="text"
+               class="form-input" placeholder="your_username" required autofocus />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input id="password" name="password" type="password"
+               class="form-input" placeholder="••••••••" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Log In</button>
+    </form>
+
+    <p class="auth-switch">
+      Don't have an account?
+      <a href="{{ url_for('register') }}">Sign up free</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

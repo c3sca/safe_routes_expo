@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}SafeRoutes{% endblock %} · Edinburgh</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <a class="navbar-brand" href="{{ url_for('index') }}">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+      <circle cx="12" cy="10" r="3"/>
+    </svg>
+    SafeRoutes
+  </a>
+
+  <div class="navbar-links">
+    <a href="{{ url_for('index') }}"   class="nav-link {% if request.endpoint=='index'   %}active{% endif %}">Map</a>
+    <!-- <a href="{{ url_for('heatmap') }}" class="nav-link {% if request.endpoint=='heatmap' %}active{% endif %}">Heatmap</a> -->
+    {% if current_user.is_authenticated %}
+      <a href="{{ url_for('rate') }}"      class="nav-link {% if request.endpoint=='rate'      %}active{% endif %}">Rate Area</a>
+      <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="{{ url_for('logout') }}" class="nav-link">Log Out</a>
+    {% else %}
+      <a href="{{ url_for('login') }}"    class="nav-link btn-nav">Log In</a>
+      <a href="{{ url_for('register') }}" class="nav-link btn-nav btn-primary">Sign Up</a>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- ── Flash messages ─────────────────────────────────────────────── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-container">
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- ── Page content ───────────────────────────────────────────────── -->
+{% block content %}{% endblock %}
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

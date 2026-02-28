@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+  <div class="dashboard-container">
+
+    <div class="dashboard-header">
+      <div class="avatar">{{ current_user.username[0].upper() }}</div>
+      <div>
+        <h1 class="dashboard-name">{{ current_user.username }}</h1>
+        <p class="dashboard-uni">{{ current_user.university }}</p>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-number">{{ ratings|length }}</div>
+        <div class="stat-label">Ratings submitted</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ routes|length }}</div>
+        <div class="stat-label">Routes generated</div>
+      </div>
+      {% if ratings %}
+      <div class="stat-card">
+        <div class="stat-number">
+          {{ "%.1f"|format(ratings|map(attribute='safety_score')|list|sum / ratings|length) }}
+        </div>
+        <div class="stat-label">Avg rating given</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Recent ratings -->
+    <section class="dashboard-section">
+      <h2 class="section-title">Your recent ratings</h2>
+      {% if ratings %}
+        <div class="ratings-list">
+          {% for r in ratings %}
+          <div class="rating-item">
+            <div class="rating-area">{{ r.area_name or "Unknown area" }}</div>
+            <div class="rating-meta">
+              <span class="badge badge-{{ r.time_of_day }}">{{ r.time_of_day }}</span>
+              <div class="mini-stars">
+                {% for i in range(1, 6) %}
+                  <span class="mini-star {% if i <= r.safety_score %}filled{% endif %}">★</span>
+                {% endfor %}
+              </div>
+              <span class="rating-date">{{ r.created_at.strftime('%d %b %Y') }}</span>
+            </div>
+            {% if r.comment %}
+            <div class="rating-comment">"{{ r.comment }}"</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">
+          You haven't submitted any ratings yet.
+          <a href="{{ url_for('rate') }}">Rate an area →</a>
+        </p>
+      {% endif %}
+    </section>
+
+    <!-- Recent routes -->
+    <section class="dashboard-section">
+      <h2 class="section-title">Your recent routes</h2>
+      {% if routes %}
+        <div class="routes-list">
+          {% for route in routes %}
+          <div class="route-item">
+            <div class="route-algo-badge">{{ route.algorithm or 'A*' }}</div>
+            <div class="route-detail">
+              <div>
+                <span class="route-stat-val">{{ "%.2f"|format(route.distance_km or 0) }}</span>
+                <span class="route-stat-unit">km</span>
+              </div>
+              <div>
+                <span class="route-stat-val">{{ "%.0f"|format((route.distance_km or 0) / 0.08) }}</span>
+                <span class="route-stat-unit">min</span>
+              </div>
+              <div>
+                <span class="route-stat-val">{{ "%.1f"|format((route.safety_score or 0) * 10) }}</span>
+                <span class="route-stat-unit">/10 safety</span>
+              </div>
+            </div>
+            <span class="rating-date">{{ route.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">
+          No routes yet. <a href="{{ url_for('index') }}">Plan a route →</a>
+        </p>
+      {% endif %}
+    </section>
+
+  </div>
+</div>
+{% endblock %}

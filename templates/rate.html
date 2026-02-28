@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Rate an Area{% endblock %}
+
+{% block content %}
+<div class="rate-page">
+
+  <div class="rate-panel">
+    <h1 class="page-title">Rate an Area</h1>
+    <p class="page-subtitle">
+      Your experience helps other women navigate Edinburgh more safely.
+      Click on the map to pick a location, then fill in the form.
+    </p>
+
+    <!-- Map for selecting location -->
+    <div id="rateMap" class="rate-map"></div>
+
+    <div class="selected-location" id="selectedLocation">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2">
+        <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      <span id="locationText">Click on the map to select a location</span>
+    </div>
+
+    <form id="ratingForm" class="rating-form">
+      <input type="hidden" id="ratingLat" name="latitude" />
+      <input type="hidden" id="ratingLng" name="longitude" />
+
+      <!-- Star rating -->
+      <div class="form-group">
+        <label class="form-label">How safe did you feel here?</label>
+        <div class="star-rating" id="starRating">
+          {% for i in range(1, 6) %}
+          <button type="button" class="star" data-value="{{ i }}">★</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" id="ratingScore" name="safety_score" value="" />
+        <div class="star-labels">
+          <span>Very unsafe</span>
+          <span>Very safe</span>
+        </div>
+      </div>
+
+      <!-- Time of day -->
+      <div class="form-group">
+        <label class="form-label">When were you there?</label>
+        <div class="toggle-group">
+          <button type="button" class="toggle-btn active" data-time="day">Daytime</button>
+          <button type="button" class="toggle-btn" data-time="evening">Evening</button>
+          <button type="button" class="toggle-btn" data-time="night">Night</button>
+        </div>
+        <input type="hidden" id="ratingTime" name="time_of_day" value="day" />
+      </div>
+
+      <!-- Comment -->
+      <div class="form-group">
+        <label class="form-label" for="ratingComment">
+          Add a note <span class="optional">(optional)</span>
+        </label>
+        <textarea id="ratingComment" name="comment" class="form-input form-textarea"
+                  placeholder="e.g. Very well-lit, felt comfortable walking alone at night"
+                  rows="3" maxlength="300"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full" id="submitRatingBtn" disabled>
+        Submit Rating
+      </button>
+
+      <div id="ratingSuccess" class="success-card hidden">
+        ✓ Thank you! Your rating has been recorded and our models have been updated.
+      </div>
+      <div id="ratingError" class="error-card hidden"></div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Rating page map and form logic ────────────────────────────────────────
+
+const rateMap = L.map("rateMap").setView([55.9533, -3.1883], 14);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap contributors",
+  maxZoom: 19,
+}).addTo(rateMap);
+
+let selectedMarker = null;
+let selectedLat = null;
+let selectedLng = null;
+
+// Custom purple marker
+const purpleIcon = L.divIcon({
+  className: "",
+  html: `<div style="width:14px;height:14px;background:#7C3AED;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>`,
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
+
+rateMap.on("click", function (e) {
+  selectedLat = e.latlng.lat.toFixed(6);
+  selectedLng = e.latlng.lng.toFixed(6);
+
+  if (selectedMarker) rateMap.removeLayer(selectedMarker);
+  selectedMarker = L.marker([selectedLat, selectedLng], { icon: purpleIcon }).addTo(rateMap);
+
+  document.getElementById("ratingLat").value = selectedLat;
+  document.getElementById("ratingLng").value = selectedLng;
+  document.getElementById("locationText").textContent =
+    `Selected: ${parseFloat(selectedLat).toFixed(4)}°N, ${Math.abs(parseFloat(selectedLng)).toFixed(4)}°W`;
+
+  checkFormReady();
+
+  // Reverse geocode for a friendly name
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${selectedLat}&lon=${selectedLng}&format=json`)
+    .then(r => r.json())
+    .then(d => {
+      const name = d.address?.suburb || d.address?.neighbourhood || d.address?.road || "this location";
+      document.getElementById("locationText").textContent = `Selected: ${name}`;
+    }).catch(() => {});
+});
+
+// ── Star rating ───────────────────────────────────────────────────────────
+let selectedScore = null;
+document.querySelectorAll(".star").forEach(star => {
+  star.addEventListener("click", function () {
+    selectedScore = parseInt(this.dataset.value);
+    document.getElementById("ratingScore").value = selectedScore;
+    document.querySelectorAll(".star").forEach((s, i) => {
+      s.classList.toggle("active", i < selectedScore);
+    });
+    checkFormReady();
+  });
+  star.addEventListener("mouseover", function () {
+    const v = parseInt(this.dataset.value);
+    document.querySelectorAll(".star").forEach((s, i) => {
+      s.classList.toggle("hover", i < v);
+    });
+  });
+  star.addEventListener("mouseout", function () {
+    document.querySelectorAll(".star").forEach(s => s.classList.remove("hover"));
+  });
+});
+
+// ── Time of day toggle ────────────────────────────────────────────────────
+document.querySelectorAll("[data-time]").forEach(btn => {
+  btn.addEventListener("click", function () {
+    document.querySelectorAll("[data-time]").forEach(b => b.classList.remove("active"));
+    this.classList.add("active");
+    document.getElementById("ratingTime").value = this.dataset.time;
+  });
+});
+
+function checkFormReady() {
+  const ready = selectedLat !== null && selectedScore !== null;
+  document.getElementById("submitRatingBtn").disabled = !ready;
+}
+
+// ── Form submission ───────────────────────────────────────────────────────
+document.getElementById("ratingForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+
+  const payload = {
+    latitude:     parseFloat(document.getElementById("ratingLat").value),
+    longitude:    parseFloat(document.getElementById("ratingLng").value),
+    safety_score: parseInt(document.getElementById("ratingScore").value),
+    time_of_day:  document.getElementById("ratingTime").value,
+    comment:      document.getElementById("ratingComment").value,
+  };
+
+  document.getElementById("submitRatingBtn").disabled = true;
+  document.getElementById("submitRatingBtn").textContent = "Submitting…";
+
+  fetch("/api/rate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById("ratingSuccess").classList.remove("hidden");
+      document.getElementById("ratingError").classList.add("hidden");
+      // Reset form
+      selectedScore = null;
+      selectedLat = null;
+      selectedLng = null;
+      document.querySelectorAll(".star").forEach(s => s.classList.remove("active"));
+      document.getElementById("ratingScore").value = "";
+      document.getElementById("ratingComment").value = "";
+      document.getElementById("locationText").textContent = "Click on the map to select a location";
+      if (selectedMarker) { rateMap.removeLayer(selectedMarker); selectedMarker = null; }
+    } else {
+      throw new Error(data.error || "Submission failed");
+    }
+  })
+  .catch(err => {
+    document.getElementById("ratingError").textContent = err.message;
+    document.getElementById("ratingError").classList.remove("hidden");
+  })
+  .finally(() => {
+    document.getElementById("submitRatingBtn").disabled = false;
+    document.getElementById("submitRatingBtn").textContent = "Submit Rating";
+    checkFormReady();
+  });
+});
+</script>
+{% endblock %}
