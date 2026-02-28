@@ -76,11 +76,9 @@ def load_edinburgh_graph(graph_path: str, bbox: dict) -> Optional[object]:
     print("[OSMnx] Downloading Edinburgh walkable street graph...")
     print("        (This may take 30–60 seconds on first run)")
     try:
+        ox.settings.max_query_area_size = 1_000_000_000  # 1 000 km² – no subdivision for Edinburgh
         G = ox.graph_from_bbox(
-            north=bbox["north"],
-            south=bbox["south"],
-            east=bbox["east"],
-            west=bbox["west"],
+            (bbox["west"], bbox["south"], bbox["east"], bbox["north"]),
             network_type="walk",
             simplify=True,
         )

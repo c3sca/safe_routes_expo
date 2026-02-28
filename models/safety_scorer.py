@@ -21,17 +21,17 @@ def haversine_dist(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
-def find_nearest_area(lat: float, lng: float, areas) -> Optional[object]:
+def find_nearest_street(lat: float, lng: float, streets) -> Optional[object]:
     """
-    Return the Area ORM object closest to (lat, lng).
+    Return the Street ORM object closest to (lat, lng).
 
     Parameters
     ----------
-    areas : list of Area ORM objects
+    streets : list of Street ORM objects
     """
-    if not areas:
+    if not streets:
         return None
-    closest = min(areas, key=lambda a: haversine_dist(lat, lng, a.latitude, a.longitude))
+    closest = min(streets, key=lambda s: haversine_dist(lat, lng, s.latitude, s.longitude))
     return closest
 
 
@@ -64,20 +64,20 @@ def compute_composite(bayesian_score: float,
     return float(np.clip(composite, 0.0, 1.0))
 
 
-def update_area_score(area, db_session,
-                      bayes_estimator=None,
-                      w1: float = 0.5,
-                      w2: float = 0.3,
-                      w3: float = 0.2) -> float:
+def update_street_score(street, db_session,
+                        bayes_estimator=None,
+                        w1: float = 0.5,
+                        w2: float = 0.3,
+                        w3: float = 0.2) -> float:
     """
-    Recompute and persist the composite safety score for one area.
+    Recompute and persist the composite safety score for one street.
 
-    Called after a new rating is submitted so the area score stays current.
+    Called after a new rating is submitted so the street score stays current.
 
     Parameters
     ----------
-    area          : Area ORM object
-    db_session    : SQLAlchemy db.session
+    street          : Street ORM object
+    db_session      : SQLAlchemy db.session
     bayes_estimator : BayesianSafetyEstimator instance (optional)
 
     Returns
@@ -86,18 +86,15 @@ def update_area_score(area, db_session,
     """
     from models.database import SafetyRating
 
-    # Get all ratings for this area
-    ratings = SafetyRating.query.filter_by(area_name=area.name).all()
+    ratings = SafetyRating.query.filter_by(street_name=street.name).all()
 
     if not ratings:
-        return area.composite_safety_score
+        return street.composite_safety_score
 
-    # Simple average (normalised)
-    avg_raw = sum(r.safety_score for r in ratings) / len(ratings)
+    avg_raw  = sum(r.safety_score for r in ratings) / len(ratings)
     avg_norm = (avg_raw - 1) / 4.0       # 1–5 → 0–1
-    area.avg_user_score = avg_norm
+    street.avg_user_score = avg_norm
 
-    # Use Bayesian estimator if available, otherwise use simple average
     if bayes_estimator is not None:
         norm_scores = [(r.safety_score - 1) / 4.0 for r in ratings]
         b_score = bayes_estimator.estimate(norm_scores)
@@ -105,21 +102,21 @@ def update_area_score(area, db_session,
         b_score = avg_norm
 
     new_composite = compute_composite(
-        b_score, area.crime_rate_normalised, area.lighting_score,
+        b_score, street.crime_rate_normalised, street.lighting_score,
         w1, w2, w3
     )
-    area.composite_safety_score = new_composite
+    street.composite_safety_score = new_composite
     db_session.commit()
     return new_composite
 
 
-def get_heatmap_data(areas, filter_mode: str = "composite") -> List[Dict]:
+def get_heatmap_data(streets, filter_mode: str = "composite") -> List[Dict]:
     """
     Prepare heatmap point data for Leaflet.heat.
 
     Parameters
     ----------
-    areas       : list of Area ORM objects
+    streets     : list of Street ORM objects
     filter_mode : 'composite' | 'user' | 'crime'
 
     Returns
@@ -128,18 +125,18 @@ def get_heatmap_data(areas, filter_mode: str = "composite") -> List[Dict]:
     where score is in [0, 1] with 1 = safest.
     """
     result = []
-    for area in areas:
+    for street in streets:
         if filter_mode == "user":
-            score = area.avg_user_score
+            score = street.avg_user_score
         elif filter_mode == "crime":
-            score = 1.0 - area.crime_rate_normalised   # invert: low crime = safe
+            score = 1.0 - street.crime_rate_normalised   # invert: low crime = safe
         else:
-            score = area.composite_safety_score
+            score = street.composite_safety_score
 
         result.append({
-            "lat":   area.latitude,
-            "lng":   area.longitude,
-            "name":  area.name,
+            "lat":   street.latitude,
+            "lng":   street.longitude,
+            "name":  street.name,
             "score": round(float(score), 3),
         })
     return result

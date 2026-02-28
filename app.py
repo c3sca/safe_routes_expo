@@ -32,7 +32,7 @@ from flask_login import (LoginManager, login_user, logout_user,
                          login_required, current_user)
 
 from config import Config
-from models.database import db, User, SafetyRating, Area, Route
+from models.database import db, User, SafetyRating, Street, Route
 
 # ── App factory ──────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -96,7 +96,7 @@ def startup():
 @app.route("/")
 def index():
     """Main map and routing page."""
-    areas = Area.query.all()
+    areas = Street.query.all()
     return render_template("index.html", areas=areas)
 
 
@@ -292,18 +292,18 @@ def api_rate():
     if not 1 <= score <= 5:
         return jsonify({"error": "safety_score must be 1–5"}), 400
 
-    # Find the nearest area
-    areas = Area.query.all()
-    from models.safety_scorer import find_nearest_area
-    nearest = find_nearest_area(lat, lng, areas)
-    area_name = nearest.name if nearest else "Unknown"
+    # Find the nearest street
+    streets = Street.query.all()
+    from models.safety_scorer import find_nearest_street
+    nearest     = find_nearest_street(lat, lng, streets)
+    street_name = nearest.name if nearest else "Unknown"
 
     # Persist the rating
     rating = SafetyRating(
         user_id=current_user.id,
         latitude=lat,
         longitude=lng,
-        area_name=area_name,
+        street_name=street_name,
         safety_score=score,
         time_of_day=tod,
         comment=comment or None,
@@ -322,26 +322,25 @@ def api_rate():
             hist_avg=nearest.avg_user_score,
             true_score=norm_score,
         )
-        # Persist updated model
         try:
             _online_learner.save(Config.RIVER_MODEL_PATH)
         except Exception:
             pass   # non-fatal
 
-    # ── Bayesian area score update ─────────────────────────────────────
+    # ── Bayesian street score update ───────────────────────────────────
     if nearest is not None:
         bayes = _ml_models.get("bayes")
-        from models.safety_scorer import update_area_score
-        new_composite = update_area_score(nearest, db.session, bayes,
-                                          Config.SCORE_W1,
-                                          Config.SCORE_W2,
-                                          Config.SCORE_W3)
+        from models.safety_scorer import update_street_score
+        new_composite = update_street_score(nearest, db.session, bayes,
+                                            Config.SCORE_W1,
+                                            Config.SCORE_W2,
+                                            Config.SCORE_W3)
     else:
         new_composite = None
 
     return jsonify({
-        "success":    True,
-        "area_name":  area_name,
+        "success":          True,
+        "street_name":      street_name,
         "new_composite_score": new_composite,
         "river_stats": _online_learner.get_stats() if _online_learner else {},
     })
@@ -349,26 +348,26 @@ def api_rate():
 
 @app.route("/api/areas")
 def api_areas():
-    """Return all area records with their safety scores."""
-    areas = Area.query.all()
+    """Return all street records with their safety scores."""
+    streets = Street.query.all()
     return jsonify([{
-        "name":             a.name,
-        "lat":              a.latitude,
-        "lng":              a.longitude,
-        "composite_score":  round(a.composite_safety_score, 3),
-        "avg_user_score":   round(a.avg_user_score, 3),
-        "crime_rate":       round(a.crime_rate_normalised, 3),
-        "lighting":         round(a.lighting_score, 3),
-    } for a in areas])
+        "name":             s.name,
+        "lat":              s.latitude,
+        "lng":              s.longitude,
+        "composite_score":  round(s.composite_safety_score, 3),
+        "avg_user_score":   round(s.avg_user_score, 3),
+        "crime_rate":       round(s.crime_rate_normalised, 3),
+        "lighting":         round(s.lighting_score, 3),
+    } for s in streets])
 
 
 @app.route("/api/heatmap_data")
 def api_heatmap_data():
     """Return heatmap points for Leaflet.heat."""
-    mode  = request.args.get("mode", "composite")
-    areas = Area.query.all()
+    mode    = request.args.get("mode", "composite")
+    streets = Street.query.all()
     from models.safety_scorer import get_heatmap_data
-    points = get_heatmap_data(areas, filter_mode=mode)
+    points = get_heatmap_data(streets, filter_mode=mode)
     return jsonify(points)
 
 
@@ -385,15 +384,15 @@ def api_area_info():
     except (KeyError, ValueError):
         return jsonify({"error": "lat and lng are required"}), 400
 
-    areas = Area.query.all()
-    from models.safety_scorer import find_nearest_area
-    nearest = find_nearest_area(lat, lng, areas)
+    streets = Street.query.all()
+    from models.safety_scorer import find_nearest_street
+    nearest = find_nearest_street(lat, lng, streets)
     if nearest is None:
-        return jsonify({"error": "No areas found"}), 404
+        return jsonify({"error": "No streets found"}), 404
 
-    # Recent ratings for this area
+    # Recent ratings for this street
     recent_ratings = (SafetyRating.query
-                      .filter_by(area_name=nearest.name)
+                      .filter_by(street_name=nearest.name)
                       .order_by(SafetyRating.created_at.desc())
                       .limit(5)
                       .all())
@@ -430,10 +429,10 @@ def api_predict_score():
     if predictor is None:
         return jsonify({"score": 0.5, "source": "default"})
 
-    # Look up area features for context
-    areas = Area.query.all()
-    from models.safety_scorer import find_nearest_area
-    nearest = find_nearest_area(lat, lng, areas)
+    # Look up street features for context
+    streets = Street.query.all()
+    from models.safety_scorer import find_nearest_street
+    nearest = find_nearest_street(lat, lng, streets)
     crime   = nearest.crime_rate_normalised if nearest else 0.5
     light   = nearest.lighting_score        if nearest else 0.5
     avg     = nearest.avg_user_score        if nearest else 0.5

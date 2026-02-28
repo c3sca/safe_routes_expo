@@ -149,7 +149,7 @@ class OnlineSafetyLearner:
             return None
         return float(min(1.0, max(0.0, pred)))
 
-    def warm_up(self, ratings_df, areas_df) -> None:
+    def warm_up(self, ratings_df, streets_df) -> None:
         """
         Pre-train the River model on historical seed data so it starts
         with reasonable weights rather than zero knowledge.
@@ -157,8 +157,8 @@ class OnlineSafetyLearner:
         Parameters
         ----------
         ratings_df : pd.DataFrame  [latitude, longitude, time_of_day,
-                                    area_name, safety_score]
-        areas_df   : pd.DataFrame  [area_name, crime_rate_normalised,
+                                    street_name, safety_score]
+        streets_df : pd.DataFrame  [street_name, crime_rate_normalised,
                                     lighting_score, avg_user_score]
         """
         if self.model is None or ratings_df.empty:
@@ -166,14 +166,14 @@ class OnlineSafetyLearner:
 
         print(f"[River] Warming up on {len(ratings_df)} historical ratings...")
 
-        # Build a lookup for area features
-        area_lookup = areas_df.set_index("area_name").to_dict("index")
+        # Build a lookup for street features
+        street_lookup = streets_df.set_index("street_name").to_dict("index")
 
         for _, row in ratings_df.iterrows():
-            area_info = area_lookup.get(row.get("area_name", ""), {})
-            crime     = float(area_info.get("crime_rate_normalised", 0.5))
-            lighting  = float(area_info.get("lighting_score", 0.5))
-            hist_avg  = float(area_info.get("avg_user_score", 0.5))
+            street_info = street_lookup.get(row.get("street_name", ""), {})
+            crime     = float(street_info.get("crime_rate_normalised", 0.5))
+            lighting  = float(street_info.get("lighting_score", 0.5))
+            hist_avg  = float(street_info.get("avg_user_score", 0.5))
             norm_score = (row["safety_score"] - 1) / 4.0   # 1–5 → 0–1
 
             self.learn_one(
@@ -217,7 +217,7 @@ def initialise_online_learner(app, db_instance, river_model_path: str) -> Online
     Called at app startup.
     """
     import pandas as pd
-    from models.database import SafetyRating, Area
+    from models.database import SafetyRating, Street
 
     # Try loading an existing model
     if os.path.exists(river_model_path):
@@ -234,24 +234,24 @@ def initialise_online_learner(app, db_instance, river_model_path: str) -> Online
 
     with app.app_context():
         ratings_rows = SafetyRating.query.all()
-        areas_rows   = Area.query.all()
+        streets_rows = Street.query.all()
 
         ratings_df = pd.DataFrame([{
             "latitude":    r.latitude,
             "longitude":   r.longitude,
             "time_of_day": r.time_of_day,
-            "area_name":   r.area_name,
+            "street_name": r.street_name,
             "safety_score": r.safety_score,
         } for r in ratings_rows])
 
-        areas_df = pd.DataFrame([{
-            "area_name":             a.name,
-            "crime_rate_normalised": a.crime_rate_normalised,
-            "lighting_score":        a.lighting_score,
-            "avg_user_score":        a.avg_user_score,
-        } for a in areas_rows])
+        streets_df = pd.DataFrame([{
+            "street_name":           s.name,
+            "crime_rate_normalised": s.crime_rate_normalised,
+            "lighting_score":        s.lighting_score,
+            "avg_user_score":        s.avg_user_score,
+        } for s in streets_rows])
 
-        learner.warm_up(ratings_df, areas_df)
+        learner.warm_up(ratings_df, streets_df)
 
     learner.save(river_model_path)
     return learner

@@ -55,14 +55,14 @@ class SafetyRating(db.Model):
     user_id     = db.Column(db.Integer,  db.ForeignKey("users.id"), nullable=False)
     latitude    = db.Column(db.Float,    nullable=False)
     longitude   = db.Column(db.Float,    nullable=False)
-    area_name   = db.Column(db.String(128))
+    street_name = db.Column(db.String(128))
     safety_score = db.Column(db.Integer, nullable=False)   # 1–5
     time_of_day = db.Column(db.String(16), default="day")  # day/evening/night
     comment     = db.Column(db.Text,     nullable=True)
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self) -> str:
-        return f"<SafetyRating user={self.user_id} area={self.area_name} score={self.safety_score}>"
+        return f"<SafetyRating user={self.user_id} street={self.street_name} score={self.safety_score}>"
 
 
 class Area(db.Model):
@@ -91,7 +91,8 @@ class Area(db.Model):
 
 
 class Route(db.Model):
-    """A safety-optimised walking route generated for a user."""
+    """A safety-optimised walking route generated for
+    a user."""
     __tablename__ = "routes"
 
     id              = db.Column(db.Integer,   primary_key=True)
@@ -108,3 +109,28 @@ class Route(db.Model):
 
     def __repr__(self) -> str:
         return f"<Route id={self.id} safety={self.safety_score:.2f} dist={self.distance_km:.2f}km>"
+
+
+class Street(db.Model):
+    """
+    An Edinburgh street with aggregated safety scores.
+
+    avg_user_score         – simple mean of all user ratings (0–1 normalised)
+    crime_rate_normalised  – 0 = no crime, 1 = highest crime
+    lighting_score         – 0 = dark, 1 = well-lit
+    composite_safety_score – ML-derived weighted score (0–1, higher = safer)
+    """
+    __tablename__ = "streets"
+
+    id                     = db.Column(db.Integer, primary_key=True)
+    name                   = db.Column(db.String(128), unique=True, nullable=False)
+    latitude               = db.Column(db.Float,  nullable=False)
+    longitude              = db.Column(db.Float,  nullable=False)
+    avg_user_score         = db.Column(db.Float,  default=0.5)
+    crime_rate_normalised  = db.Column(db.Float,  default=0.5)
+    lighting_score         = db.Column(db.Float,  default=0.5)
+    composite_safety_score = db.Column(db.Float,  default=0.5)
+    last_updated           = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<Area {self.name} composite={self.composite_safety_score:.2f}>"
